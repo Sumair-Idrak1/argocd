@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: sumairjaved/my-frontend
-  pullPolicy: IfNotPresent
+  imagePullPolicy: Always
   tag: "latest"
 
 service:
