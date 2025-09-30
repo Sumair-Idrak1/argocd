@@ -1,4 +1,4 @@
-replicaCount: 1
+replicaCount: 100
 image:
   repository: sumairjaved/my-frontend
   imagePullPolicy: Always
