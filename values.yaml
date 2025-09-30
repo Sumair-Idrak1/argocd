@@ -1,16 +1,13 @@
 replicaCount: 1
-
 image:
   repository: sumairjaved/my-frontend
   imagePullPolicy: Always
   tag: "latest"
-
 service:
-  type: NodePort       # or ClusterIP if only internal
-  port: 5000             # Service port
-  targetPort: 5000     # Container port
-  nodePort: 30080    # Optional: set specific NodePort
-
+  type: NodePort # or ClusterIP if only internal
+  port: 5000 # Service port
+  targetPort: 5000 # Container port
+  nodePort: 30080 # Optional: set specific NodePort
 resources:
   limits:
     cpu: 500m
@@ -18,19 +15,14 @@ resources:
   requests:
     cpu: 250m
     memory: 256Mi
-
 autoscaling:
   enabled: false
-
 nodeSelector: {}
 tolerations: []
 affinity: {}
-
 serviceAccount:
   name: ""
-
 httpRoute:
   enabled: false
-
 ingress:
-  enabled: false       # Disable ingress completely
+  enabled: false # Disable ingress completely
