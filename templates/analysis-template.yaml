@@ -23,7 +23,6 @@ spec:
         query: |
           sum(kube_pod_container_status_waiting_reason{
             namespace="{{ .AnalysisRun.Namespace }}",
-            # CORRECTLY reference the argument with the leading dot: .args.rollout-name
             pod=~"{{ .args.rollout-name }}.*",
             reason="CrashLoopBackOff"
           })
@@ -31,7 +30,7 @@ spec:
     # Success Condition: The value must be 0 (i.e., no pods in CrashLoopBackOff).
     successCondition: "{{ eq .value 0 }}"
 
-  # Metric 2: Check for General Pod Readiness (Must align with the hyphen above)
+  # Metric 2: Check for General Pod Readiness
   - name: pod-ready-check
     interval: 15s
     consecutiveSuccessLimit: 8 # Requires 2 minutes of continuous pod readiness
@@ -43,7 +42,6 @@ spec:
         query: |
           sum(kube_pod_container_status_ready{
             namespace="{{ .AnalysisRun.Namespace }}",
-            # CORRECTLY reference the argument with the leading dot: .args.rollout-name
             pod=~"{{ .args.rollout-name }}.*",
             container_ready="false"
           })
