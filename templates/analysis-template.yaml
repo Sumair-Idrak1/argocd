@@ -1,0 +1,38 @@
+# analysis-template.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: pod-health-check
+spec:
+  metrics:
+  # This metric checks the Kubernetes resource (Rollout) status directly.
+  # A successful run for 120 seconds means the pod has stabilized.
+  # A common, simpler approach is to check for specific error events.
+  - name: pod-errors
+    interval: 10s
+    failureLimit: 1 # Rollback immediately on the first failure
+    successCondition: "{{ eq .result.status \"Stable\" }}" # Custom condition (hypothetical)
+    provider:
+      job:
+        spec:
+          # This job checks for pod status/logs. For a simpler, more direct check,
+          # a Prometheus/Grafana query is usually preferred.
+          # A simpler, built-in check is often preferred for basic pod stability.
+          # Here we use a generic check that must be customized.
+          # The key is checking if the Pods in the NEW ReplicaSet have been ready
+          # and not restarting for the duration.
+          # Since direct pod health check is complex in a generic AT, the best
+          # practice is to query a monitoring system (e.g., Prometheus).
+          pass: true # Replace with actual query based on your monitoring
+          
+  # A more concrete example using Prometheus to check for 5xx errors:
+  # - name: http-5xx-errors
+  #   interval: 1m
+  #   count: 2 # Check twice over the 2-minute period
+  #   failureLimit: 1
+  #   provider:
+  #     prometheus:
+  #       address: http://prometheus-server.monitoring.svc.cluster.local
+  #       query: |
+  #         sum(rate(http_requests_total{job="deployedfrontend", status!~"^[23].*"})[2m])
+  #       successCondition: "{{ lt .value 1 }}" # Success if rate of non-2xx/3xx requests is less than 1 per second
