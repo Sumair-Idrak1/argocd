@@ -21,7 +21,7 @@ spec:
         - pause: { duration: 60 }   # Observe at 50%
 
       # Automatic rollback + retry logic
-      progressDeadlineSeconds: 120          # Wait 2 minutes for pods to stabilize
+      progressDeadlineSeconds: 30          # Wait 2 minutes for pods to stabilize
       progressDeadlineAbort: true           # Abort rollout if deadline exceeded
       abortScaleDownDelaySeconds: 10        # Wait before cleaning up bad ReplicaSet
       abortScaleDownDelayAbort: true        # Immediately restore stable RS
