@@ -8,8 +8,8 @@ spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: 5
 
-  # ⏱️ Wait max 2 minutes for progress
-  progressDeadlineSeconds: 30
+  # Wait up to 60s for pods to become ready before declaring failure
+  progressDeadlineSeconds: 60
 
   selector:
     matchLabels:
@@ -17,25 +17,27 @@ spec:
 
   strategy:
     canary:
-      # ✅ Abort rollout automatically after progressDeadlineSeconds
-      progressDeadlineAbort: true
-      abortScaleDownDelaySeconds: 0
+      # 🚦 Canary deployment with automatic rollback on failure
+      progressDeadlineAbort: true         # Abort rollout automatically when deadline exceeded
+      abortScaleDownDelaySeconds: 0       # Immediately scale down failed ReplicaSets
+      maxSurge: 1                         # Allow one extra pod during update
+      maxUnavailable: 0                   # Never take down running pods during rollout
 
       steps:
-        - setWeight: 20
-        - pause: { duration: 10 }
-        - setWeight: 50
-        - pause: { duration: 20 }
+        - setWeight: 20                   # Send 20% of traffic to the new version
+        - pause: { duration: 20 }         # Wait to ensure new pods are healthy
+        - setWeight: 50                   # Increase traffic to 50%
+        - pause: { duration: 30 }         # Wait again before promoting
+        - setWeight: 100                  # Move 100% traffic to new version
+        - pause: { duration: 10 }         # Final check before full promotion
 
-      maxSurge: 1
-      maxUnavailable: 0
-
+      # ♻️ Retry strategy for transient failures
       retryStrategy:
-        limit: 1
+        limit: 2
         backoff:
           duration: 10s
           factor: 2
-          maxDuration: 20s
+          maxDuration: 30s
 
   template:
     metadata:
@@ -46,9 +48,11 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           ports:
             - containerPort: {{ .Values.service.port }}
 
+          # 🩺 Health checks
           livenessProbe:
             httpGet:
               path: /
