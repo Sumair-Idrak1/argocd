@@ -17,9 +17,15 @@ spec:
         - pause: { duration: 30 }     # pause 30s before next step
         - setWeight: 50
         - pause: { duration: 60 }     # pause 1min before full rollout
-      # Optional if you define separate Services for canary/stable
+
+      # ✅ Auto rollback if pods fail to become healthy
+      progressDeadlineSeconds: 120       # Wait up to 2 min for pods to become healthy
+      progressDeadlineAbort: true        # Abort and rollback automatically on failure
+
+      # (Optional) define services if you want separate traffic routing
       # stableService: deployedfrontend-stable
       # canaryService: deployedfrontend-canary
+
   template:
     metadata:
       labels:
