@@ -1,37 +1,42 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: {{ include "deployedfrontend.fullname" . }}
+  name: deployedfrontend-deployedfrontend
+  namespace: deployedfrontend
   labels:
-    {{- include "deployedfrontend.labels" . | nindent 4 }}
+    app.kubernetes.io/instance: deployedfrontend
+    app.kubernetes.io/name: deployedfrontend
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: 1
   revisionHistoryLimit: 5
 
-  # Wait up to 60s for pods to become ready before declaring failure
+  # maximum time to wait for new pods to become Ready before considering progress failed
   progressDeadlineSeconds: 60
 
   selector:
     matchLabels:
-      {{- include "deployedfrontend.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/instance: deployedfrontend
+      app.kubernetes.io/name: deployedfrontend
 
   strategy:
     canary:
-      # 🚦 Canary deployment with automatic rollback on failure
-      progressDeadlineAbort: true         # Abort rollout automatically when deadline exceeded
-      abortScaleDownDelaySeconds: 0       # Immediately scale down failed ReplicaSets
-      maxSurge: 1                         # Allow one extra pod during update
-      maxUnavailable: 0                   # Never take down running pods during rollout
+      # Automatically abort the rollout when the progress deadline is exceeded
+      progressDeadlineAbort: true
+
+      # when aborting, scale down the failed RS immediately
+      abortScaleDownDelaySeconds: 0
+
+      maxSurge: 1
+      maxUnavailable: 0
 
       steps:
-        - setWeight: 20                   # Send 20% of traffic to the new version
-        - pause: { duration: 20 }         # Wait to ensure new pods are healthy
-        - setWeight: 50                   # Increase traffic to 50%
-        - pause: { duration: 30 }         # Wait again before promoting
-        - setWeight: 100                  # Move 100% traffic to new version
-        - pause: { duration: 10 }         # Final check before full promotion
+        - setWeight: 20
+        - pause: { duration: 20 }
+        - setWeight: 50
+        - pause: { duration: 30 }
+        - setWeight: 100
+        - pause: { duration: 10 }
 
-      # ♻️ Retry strategy for transient failures
       retryStrategy:
         limit: 2
         backoff:
@@ -42,29 +47,29 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "deployedfrontend.labels" . | nindent 8 }}
+        app.kubernetes.io/instance: deployedfrontend
+        app.kubernetes.io/name: deployedfrontend
     spec:
       containers:
-        - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-
+        - name: deployedfrontend
+          image: sumairjaved/my-frontend:dd19ef683c7557a94fd62216ac152a515e7ef305
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: {{ .Values.service.port }}
-
-          # 🩺 Health checks
-          livenessProbe:
-            httpGet:
-              path: /
-              port: {{ .Values.service.port }}
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            failureThreshold: 3
+            - containerPort: 5000
+              protocol: TCP
 
           readinessProbe:
             httpGet:
               path: /
-              port: {{ .Values.service.port }}
+              port: 5000
             initialDelaySeconds: 10
             periodSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
             failureThreshold: 3
