@@ -1,5 +1,5 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: {{ include "deployedfrontend.fullname" . }}
   labels:
@@ -9,6 +9,17 @@ spec:
   selector:
     matchLabels:
       {{- include "deployedfrontend.selectorLabels" . | nindent 6 }}
+  strategy:
+    canary:
+      # 🧠 Canary steps: gradually shift traffic and pause for observation
+      steps:
+        - setWeight: 20
+        - pause: { duration: 30 }     # pause 30s before next step
+        - setWeight: 50
+        - pause: { duration: 60 }     # pause 1min before full rollout
+      # Optional if you define separate Services for canary/stable
+      # stableService: deployedfrontend-stable
+      # canaryService: deployedfrontend-canary
   template:
     metadata:
       labels:
