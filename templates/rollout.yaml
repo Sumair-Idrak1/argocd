@@ -1,60 +1,72 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: deployedfrontend-deployedfrontend
-  namespace: deployedfrontend
+  name: {{ include "deployedfrontend.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/instance: deployedfrontend
-    app.kubernetes.io/name: deployedfrontend
+    {{- include "deployedfrontend.labels" . | nindent 4 }}
 spec:
-  replicas: 1
-  revisionHistoryLimit: 5
-  progressDeadlineSeconds: 120
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 60
   selector:
     matchLabels:
-      app.kubernetes.io/instance: deployedfrontend
-      app.kubernetes.io/name: deployedfrontend
+      {{- include "deployedfrontend.selectorLabels" . | nindent 6 }}
   strategy:
     canary:
       maxSurge: 1
       maxUnavailable: 0
-      canaryService: deployedfrontend-canary
-      stableService: deployedfrontend-stable
+      abortScaleDownDelaySeconds: 0
       steps:
         - setWeight: 20
-        - pause: { duration: 20 }
+        - pause: { duration: 15s }
         - setWeight: 50
-        - pause: { duration: 30 }
+        - pause: { duration: 15s }
         - setWeight: 100
-        - pause: { duration: 10 }
-      abortScaleDownDelaySeconds: 30
   template:
     metadata:
       labels:
-        app.kubernetes.io/instance: deployedfrontend
-        app.kubernetes.io/name: deployedfrontend
+        {{- include "deployedfrontend.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if .Values.serviceAccount.name }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
       containers:
-        - name: deployedfrontend
-          image: sumairjaved/my-frontend:dd19ef683c7557a94fd62216ac152a515e7ef305
-          imagePullPolicy: IfNotPresent
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.imagePullPolicy }}
           ports:
-            - containerPort: 5000
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
           readinessProbe:
             httpGet:
               path: /
-              port: 5000
+              port: http
             initialDelaySeconds: 5
             periodSeconds: 5
-            failureThreshold: 2
-            successThreshold: 1
             timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /
-              port: 5000
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 10
-            failureThreshold: 2
             timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
