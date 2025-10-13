@@ -14,20 +14,18 @@ spec:
       # 🧠 Canary steps: gradually shift traffic and pause for observation
       steps:
         - setWeight: 20
-        # 💡 NEW: Analysis step to check the new pod's health for 2 minutes (120s)
+        
+        # 💡 STEP 1: Introduce new code and immediately run a 2-minute health check.
+        # This will block the rollout until the analysis is successful (2 min stable) or fails (rollback).
         - analysis:
             templates:
-            # You must create an AnalysisTemplate named 'pod-health-check'
-            - templateName: pod-health-check
-            # The failureLimit controls how many times the analysis can fail before rollback
-            # Since you want to check for 2 minutes, the AnalysisTemplate should
-            # define a duration and an interval for its metric checks.
-            # However, you can use the analysis step's built-in support for a minimum duration.
-            # A simpler way to enforce a minimum *successful* run time is often
-            # defined within the AnalysisTemplate itself using a combination of
-            # `interval` and `count`.
-            # For simplicity here, we rely on the analysis template to check
-            # pod status or a success metric multiple times over the period.
+            # References the template defined below (pod-stability-check)
+            - templateName: pod-stability-check
+            args:
+            - name: rollout-name
+              # Passes the base name of the Rollout, which is used as the pod prefix 
+              # to scope the Prometheus query to the new ReplicaSet's pods.
+              value: {{ include "deployedfrontend.fullname" . }}
             
         - pause: { duration: 30s } # Short pause after initial health check
         - setWeight: 50
@@ -35,13 +33,11 @@ spec:
         - setWeight: 100 # Final promotion to full traffic
 
       # ✅ Auto rollback configuration
-      # The analysis step will automatically trigger a rollback on a failed result.
-      # progressDeadlineSeconds: 120 # Replaced by health check logic
       progressDeadlineAbort: true
       abortScaleDownDelaySeconds: 10
       abortScaleDownDelayAbort: true
 
-      # 🚀 Automatically revert to last stable version
+      # 🚀 Automatically revert to last stable version on failure
       rollbackTo:
         revision: 0 # 0 = revert to last stable ReplicaSet
 
