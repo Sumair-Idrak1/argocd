@@ -1,38 +1,53 @@
-# analysis-template.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:
-  name: pod-health-check
+  name: pod-stability-check
 spec:
+  # Define arguments that the Rollout can pass to this template
+  args:
+    - name: rollout-name
   metrics:
-  # This metric checks the Kubernetes resource (Rollout) status directly.
-  # A successful run for 120 seconds means the pod has stabilized.
-  # A common, simpler approach is to check for specific error events.
-  - name: pod-errors
-    interval: 10s
-    failureLimit: 1 # Rollback immediately on the first failure
-    successCondition: "{{ eq .result.status \"Stable\" }}" # Custom condition (hypothetical)
+  - name: stable-for-2-minutes
+    # 💡 The check will run every 15 seconds.
+    interval: 15s
+    # 💡 We want a minimum of 8 successful checks (15s * 8 = 120s = 2 minutes)
+    consecutiveSuccessLimit: 8
+    # 💡 If even one check fails, the analysis fails immediately, triggering a rollback.
+    failureLimit: 1
+    
+    # 📝 Metric to check for CrashLoopBackOff or other error state
     provider:
-      job:
-        spec:
-          # This job checks for pod status/logs. For a simpler, more direct check,
-          # a Prometheus/Grafana query is usually preferred.
-          # A simpler, built-in check is often preferred for basic pod stability.
-          # Here we use a generic check that must be customized.
-          # The key is checking if the Pods in the NEW ReplicaSet have been ready
-          # and not restarting for the duration.
-          # Since direct pod health check is complex in a generic AT, the best
-          # practice is to query a monitoring system (e.g., Prometheus).
-          pass: true # Replace with actual query based on your monitoring
+      prometheus:
+        # NOTE: This query requires kube-state-metrics to be installed.
+        # It checks if any container of the new Rollout ReplicaSet (identified by the argument)
+        # is currently in a waiting state with reason 'CrashLoopBackOff'.
+        # The value will be 1 if a pod is crashing, 0 otherwise.
+        query: |
+          sum(kube_pod_container_status_waiting_reason{
+            namespace="{{ .AnalysisRun.Namespace }}",
+            pod=~"{{ args.rollout-name }}.*",
+            reason="CrashLoopBackOff"
+          })
           
-  # A more concrete example using Prometheus to check for 5xx errors:
-  # - name: http-5xx-errors
-  #   interval: 1m
-  #   count: 2 # Check twice over the 2-minute period
-  #   failureLimit: 1
-  #   provider:
-  #     prometheus:
-  #       address: http://prometheus-server.monitoring.svc.cluster.local
-  #       query: |
-  #         sum(rate(http_requests_total{job="deployedfrontend", status!~"^[23].*"})[2m])
-  #       successCondition: "{{ lt .value 1 }}" # Success if rate of non-2xx/3xx requests is less than 1 per second
+    # 💡 Success Condition: The query result must be exactly 0 (no pods are in CrashLoopBackOff).
+    successCondition: "{{ eq .value 0 }}"
+
+  - name: pod-ready-check
+    interval: 15s
+    consecutiveSuccessLimit: 8 # Also requires 2 minutes (8 * 15s) of pod readiness
+    failureLimit: 1
+    
+    provider:
+      prometheus:
+        # Checks if the number of ready containers for the new ReplicaSet
+        # is less than the number of total containers. A value > 0 means
+        # not all containers are ready. We want 0.
+        query: |
+          sum(kube_pod_container_status_ready{
+            namespace="{{ .AnalysisRun.Namespace }}",
+            pod=~"{{ args.rollout-name }}.*",
+            container_ready="false"
+          })
+          
+    # 💡 Success Condition: The query result must be exactly 0 (all containers are ready).
+    successCondition: "{{ eq .value 0 }}"
