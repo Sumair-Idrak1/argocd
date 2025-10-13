@@ -8,24 +8,22 @@ spec:
     - name: rollout-name
   metrics:
   - name: stable-for-2-minutes
-    # 💡 The check will run every 15 seconds.
+    # 15s * 8 = 120s (2 minutes)
     interval: 15s
-    # 💡 We want a minimum of 8 successful checks (15s * 8 = 120s = 2 minutes)
     consecutiveSuccessLimit: 8
-    # 💡 If even one check fails, the analysis fails immediately, triggering a rollback.
+    # If even one check fails, the analysis fails immediately, triggering a rollback.
     failureLimit: 1
     
     # 📝 Metric to check for CrashLoopBackOff or other error state
     provider:
       prometheus:
         # NOTE: This query requires kube-state-metrics to be installed.
-        # It checks if any container of the new Rollout ReplicaSet (identified by the argument)
-        # is currently in a waiting state with reason 'CrashLoopBackOff'.
-        # The value will be 1 if a pod is crashing, 0 otherwise.
+        # It checks if any container of the new Rollout ReplicaSet is in 'CrashLoopBackOff'.
         query: |
           sum(kube_pod_container_status_waiting_reason{
             namespace="{{ .AnalysisRun.Namespace }}",
-            pod=~"{{ args.rollout-name }}.*",
+            # 👇 FIX IS HERE: .args.rollout-name (with the leading dot)
+            pod=~"{{ .args.rollout-name }}.*",
             reason="CrashLoopBackOff"
           })
           
@@ -34,18 +32,18 @@ spec:
 
   - name: pod-ready-check
     interval: 15s
-    consecutiveSuccessLimit: 8 # Also requires 2 minutes (8 * 15s) of pod readiness
+    consecutiveSuccessLimit: 8 # 2 minutes of continuous pod readiness
     failureLimit: 1
     
     provider:
       prometheus:
-        # Checks if the number of ready containers for the new ReplicaSet
-        # is less than the number of total containers. A value > 0 means
-        # not all containers are ready. We want 0.
+        # Checks if the number of ready containers is less than the total. A value > 0 means
+        # not all containers are ready (i.e., not yet stable/ready). We want 0.
         query: |
           sum(kube_pod_container_status_ready{
             namespace="{{ .AnalysisRun.Namespace }}",
-            pod=~"{{ args.rollout-name }}.*",
+            # 👇 FIX IS HERE: .args.rollout-name (with the leading dot)
+            pod=~"{{ .args.rollout-name }}.*",
             container_ready="false"
           })
           
