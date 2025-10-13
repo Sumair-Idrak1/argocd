@@ -4,46 +4,35 @@ metadata:
   name: {{ include "deployedfrontend.fullname" . }}
   labels:
     {{- include "deployedfrontend.labels" . | nindent 4 }}
+
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       {{- include "deployedfrontend.selectorLabels" . | nindent 6 }}
+
   strategy:
     canary:
-      # 🧠 Canary steps: gradually shift traffic and pause for observation
+      # Canary rollout steps — gradual traffic shift with pauses
       steps:
         - setWeight: 20
-        
-        # 💡 STEP 1: Introduce new code and immediately run a 2-minute health check.
-        # This will block the rollout until the analysis is successful (2 min stable) or fails (rollback).
-        - analysis:
-            templates:
-            # References the template defined below (pod-stability-check)
-            - templateName: pod-stability-check
-            args:
-            - name: rollout-name
-              # Passes the base name of the Rollout, which is used as the pod prefix 
-              # to scope the Prometheus query to the new ReplicaSet's pods.
-              value: {{ include "deployedfrontend.fullname" . }}
-            
-        - pause: { duration: 30s } # Short pause after initial health check
+        - pause: { duration: 30 }   # 30s observation
         - setWeight: 50
-        - pause: { duration: 60s }
-        - setWeight: 100 # Final promotion to full traffic
+        - pause: { duration: 60 }   # 60s observation
 
-      # ✅ Auto rollback configuration
-      progressDeadlineAbort: true
-      abortScaleDownDelaySeconds: 10
-      abortScaleDownDelayAbort: true
+      # Auto rollback settings
+      progressDeadlineSeconds: 120          # Wait up to 2 minutes for pods to stabilize
+      progressDeadlineAbort: true           # Abort rollout if deadline exceeded
+      abortScaleDownDelaySeconds: 10        # Wait before cleaning up bad RS
+      abortScaleDownDelayAbort: true        # Immediately restore stable RS
+      maxUnavailable: 0                     # Never take down all pods
+      maxSurge: 1                           # Add one extra pod during update
 
-      # 🚀 Automatically revert to last stable version on failure
-      rollbackTo:
-        revision: 0 # 0 = revert to last stable ReplicaSet
-
-      # Optional: define traffic routing services (recommended for production)
+      # Stable/Canary service routing (optional but recommended)
       # stableService: deployedfrontend-stable
       # canaryService: deployedfrontend-canary
+
+  revisionHistoryLimit: 5                   # Keep 5 previous revisions for rollback
 
   template:
     metadata:
@@ -56,5 +45,23 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.service.port }}
+
+          # Health checks to detect CrashLoop or failure early
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
