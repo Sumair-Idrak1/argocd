@@ -25,15 +25,11 @@ spec:
         - pause: { duration: 30 }
         - setWeight: 100
         - pause: { duration: 10 }
-      # Automatically abort if analysis fails
       abortScaleDownDelaySeconds: 30
       analysis:
-        startingStep: 1  # Start analysis after first step
+        startingStep: 1
         templates:
           - templateName: deployedfrontend-health-check
-        args:
-          - name: service-name
-            value: deployedfrontend
   template:
     metadata:
       labels:
@@ -70,8 +66,6 @@ metadata:
   name: deployedfrontend-health-check
   namespace: deployedfrontend
 spec:
-  args:
-    - name: service-name
   metrics:
     - name: pod-health
       initialDelay: 10s
@@ -93,8 +87,8 @@ spec:
                       - -c
                       - |
                         # Check if all pods are ready
-                        READY=$(kubectl get pods -n deployedfrontend -l app.kubernetes.io/name={{args.service-name}} -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' | grep -o "True" | wc -l)
-                        TOTAL=$(kubectl get pods -n deployedfrontend -l app.kubernetes.io/name={{args.service-name}} --no-headers | wc -l)
+                        READY=$(kubectl get pods -n deployedfrontend -l app.kubernetes.io/name=deployedfrontend -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' | grep -o "True" | wc -l)
+                        TOTAL=$(kubectl get pods -n deployedfrontend -l app.kubernetes.io/name=deployedfrontend --no-headers | wc -l)
                         
                         if [ "$READY" -eq "$TOTAL" ] && [ "$TOTAL" -gt 0 ]; then
                           echo "true"
