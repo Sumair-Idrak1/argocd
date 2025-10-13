@@ -10,7 +10,7 @@ spec:
   revisionHistoryLimit: 5
 
   # ✅ Place this at the top-level (spec), not under canary
-  progressDeadlineSeconds: 120  # Wait max 2 minutes for pods to become Ready
+  progressDeadlineSeconds: 60 # Wait max 2 minutes for pods to become Ready
 
   selector:
     matchLabels:
