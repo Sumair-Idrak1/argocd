@@ -14,19 +14,36 @@ spec:
       # 🧠 Canary steps: gradually shift traffic and pause for observation
       steps:
         - setWeight: 20
-        - pause: { duration: 30 }
+        # 💡 NEW: Analysis step to check the new pod's health for 2 minutes (120s)
+        - analysis:
+            templates:
+            # You must create an AnalysisTemplate named 'pod-health-check'
+            - templateName: pod-health-check
+            # The failureLimit controls how many times the analysis can fail before rollback
+            # Since you want to check for 2 minutes, the AnalysisTemplate should
+            # define a duration and an interval for its metric checks.
+            # However, you can use the analysis step's built-in support for a minimum duration.
+            # A simpler way to enforce a minimum *successful* run time is often
+            # defined within the AnalysisTemplate itself using a combination of
+            # `interval` and `count`.
+            # For simplicity here, we rely on the analysis template to check
+            # pod status or a success metric multiple times over the period.
+            
+        - pause: { duration: 30s } # Short pause after initial health check
         - setWeight: 50
-        - pause: { duration: 60 }
+        - pause: { duration: 60s }
+        - setWeight: 100 # Final promotion to full traffic
 
       # ✅ Auto rollback configuration
-      progressDeadlineSeconds: 120          # Wait up to 2 min for pods to stabilize
-      progressDeadlineAbort: true           # Abort rollout if deadline exceeded
-      abortScaleDownDelaySeconds: 10        # Wait 10s before cleaning up bad ReplicaSet
-      abortScaleDownDelayAbort: true        # Immediately scale up stable RS on abort
+      # The analysis step will automatically trigger a rollback on a failed result.
+      # progressDeadlineSeconds: 120 # Replaced by health check logic
+      progressDeadlineAbort: true
+      abortScaleDownDelaySeconds: 10
+      abortScaleDownDelayAbort: true
 
       # 🚀 Automatically revert to last stable version
       rollbackTo:
-        revision: 0                         # 0 = revert to last stable ReplicaSet
+        revision: 0 # 0 = revert to last stable ReplicaSet
 
       # Optional: define traffic routing services (recommended for production)
       # stableService: deployedfrontend-stable
