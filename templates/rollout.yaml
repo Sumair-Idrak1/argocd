@@ -4,50 +4,35 @@ metadata:
   name: {{ include "deployedfrontend.fullname" . }}
   labels:
     {{- include "deployedfrontend.labels" . | nindent 4 }}
-
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       {{- include "deployedfrontend.selectorLabels" . | nindent 6 }}
-
   strategy:
     canary:
-      # Canary rollout steps — gradual traffic shift with pauses
       steps:
         - setWeight: 20
-        - pause: { duration: 10 }   # Observe at 20%
+        - pause: { duration: 10 }  # Observe at 20%
         - setWeight: 50
-        - pause: { duration: 20 }   # Observe at 50%
+        - pause: { duration: 20 }  # Observe at 50%
 
-      # Automatic rollback + retry logic
-      progressDeadlineSeconds: 30           # Wait 30s for pods to stabilize
-      progressDeadlineAbort: true           # Abort rollout if deadline exceeded
-      abortScaleDownDelaySeconds: 0         # Immediately remove bad ReplicaSet
-      abortScaleDownDelayAbort: true        # Immediately restore stable RS
-      maxUnavailable: 0                     # Never take down all pods
-      maxSurge: 1                           # Add one extra pod during update
+      # Abort rollout if pods fail to become Ready in time
+      progressDeadlineSeconds: 60
+      progressDeadlineAbort: true
+      abortScaleDownDelaySeconds: 0
+      maxUnavailable: 0
+      maxSurge: 1
 
-      # Fast failure detection — rollback on CrashLoopBackOff or readiness failure
-      failureDetection:
-        enabled: true
-        failureRate: 1                      # Abort after first detected failure
-        intervalSeconds: 10                 # Check every 10 seconds
-        threshold: 3                        # Confirm failure after 3 failed checks
-
-      # Retry rollout once — terminate after second failure
+      # Retry logic
       retryStrategy:
         limit: 2
         backoff:
           duration: 30s
           factor: 2
-          maxDuration: 40s
+          maxDuration: 60s
 
-      # Optional service routing (for ingress or load balancer)
-      # stableService: deployedfrontend-stable
-      # canaryService: deployedfrontend-canary
-
-  revisionHistoryLimit: 5                   # Keep 5 revisions for rollback
+  revisionHistoryLimit: 5
 
   template:
     metadata:
@@ -61,7 +46,6 @@ spec:
           ports:
             - containerPort: {{ .Values.service.port }}
 
-          # Health checks to detect CrashLoop or failure early
           livenessProbe:
             httpGet:
               path: /
@@ -77,6 +61,3 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 3
-
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
