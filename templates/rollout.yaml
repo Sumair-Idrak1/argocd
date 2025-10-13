@@ -9,7 +9,7 @@ spec:
   revisionHistoryLimit: 5
 
   # ⏱️ Wait max 2 minutes for progress
-  progressDeadlineSeconds: 120
+  progressDeadlineSeconds: 60
 
   selector:
     matchLabels:
