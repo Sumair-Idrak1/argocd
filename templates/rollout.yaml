@@ -4,35 +4,41 @@ metadata:
   name: {{ include "deployedfrontend.fullname" . }}
   labels:
     {{- include "deployedfrontend.labels" . | nindent 4 }}
+
 spec:
   replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 5
   selector:
     matchLabels:
       {{- include "deployedfrontend.selectorLabels" . | nindent 6 }}
+
   strategy:
     canary:
+      # Canary steps
       steps:
         - setWeight: 20
-        - pause: { duration: 10 }  # Observe at 20%
+        - pause: { duration: 10 }   # Observe for 30s
         - setWeight: 50
-        - pause: { duration: 20 }  # Observe at 50%
+        - pause: { duration: 20 }   # Observe for 1 min before progressing
 
-      # Abort rollout if pods fail to become Ready in time
-      progressDeadlineSeconds: 60
-      progressDeadlineAbort: true
+      # If rollout doesn’t progress (pods not Ready)
+      progressDeadlineSeconds: 40   # Wait 2 minutes max for pod readiness
+      progressDeadlineAbort: true    # Abort automatically if deadline exceeded
+
+      # Don’t leave failed replicas running
       abortScaleDownDelaySeconds: 0
-      maxUnavailable: 0
+
+      # Pod surge settings (optional but recommended)
       maxSurge: 1
+      maxUnavailable: 0
 
-      # Retry logic
+      # Retry strategy in case of failure
       retryStrategy:
-        limit: 2
+        limit: 1
         backoff:
-          duration: 30s
+          duration: 10s
           factor: 2
-          maxDuration: 60s
-
-  revisionHistoryLimit: 5
+          maxDuration: 20s
 
   template:
     metadata:
