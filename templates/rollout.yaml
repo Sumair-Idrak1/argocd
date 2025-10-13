@@ -10,16 +10,12 @@ spec:
   replicas: 1
   revisionHistoryLimit: 5
   progressDeadlineSeconds: 60
-
   selector:
     matchLabels:
       app.kubernetes.io/instance: deployedfrontend
       app.kubernetes.io/name: deployedfrontend
-
   strategy:
     canary:
-      progressDeadlineAbort: true          # <-- ensure this is directly under 'canary'
-      abortScaleDownDelaySeconds: 0
       maxSurge: 1
       maxUnavailable: 0
       steps:
@@ -29,7 +25,15 @@ spec:
         - pause: { duration: 30 }
         - setWeight: 100
         - pause: { duration: 10 }
-
+      # Automatically abort if analysis fails
+      abortScaleDownDelaySeconds: 30
+      analysis:
+        startingStep: 1  # Start analysis after first step
+        templates:
+          - templateName: deployedfrontend-health-check
+        args:
+          - name: service-name
+            value: deployedfrontend
   template:
     metadata:
       labels:
@@ -43,7 +47,6 @@ spec:
           ports:
             - containerPort: 5000
               protocol: TCP
-
           readinessProbe:
             httpGet:
               path: /
@@ -51,7 +54,7 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 3
-
+            timeoutSeconds: 3
           livenessProbe:
             httpGet:
               path: /
@@ -59,3 +62,44 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
             failureThreshold: 3
+            timeoutSeconds: 3
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: deployedfrontend-health-check
+  namespace: deployedfrontend
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: pod-health
+      initialDelay: 10s
+      interval: 10s
+      count: 5
+      successCondition: result == "true"
+      failureLimit: 2
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                containers:
+                  - name: health-check
+                    image: bitnami/kubectl:latest
+                    command:
+                      - sh
+                      - -c
+                      - |
+                        # Check if all pods are ready
+                        READY=$(kubectl get pods -n deployedfrontend -l app.kubernetes.io/name={{args.service-name}} -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' | grep -o "True" | wc -l)
+                        TOTAL=$(kubectl get pods -n deployedfrontend -l app.kubernetes.io/name={{args.service-name}} --no-headers | wc -l)
+                        
+                        if [ "$READY" -eq "$TOTAL" ] && [ "$TOTAL" -gt 0 ]; then
+                          echo "true"
+                        else
+                          echo "false"
+                          exit 1
+                        fi
+                restartPolicy: Never
