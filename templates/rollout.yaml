@@ -9,7 +9,7 @@ spec:
   revisionHistoryLimit: 5
 
   # ⏱️ Wait max 2 minutes for progress
-  progressDeadlineSeconds: 120
+  progressDeadlineSeconds: 30
 
   selector:
     matchLabels:
@@ -23,9 +23,9 @@ spec:
 
       steps:
         - setWeight: 20
-        - pause: { duration: 30 }
+        - pause: { duration: 10 }
         - setWeight: 50
-        - pause: { duration: 60 }
+        - pause: { duration: 20 }
 
       maxSurge: 1
       maxUnavailable: 0
@@ -33,9 +33,9 @@ spec:
       retryStrategy:
         limit: 1
         backoff:
-          duration: 30s
+          duration: 10s
           factor: 2
-          maxDuration: 60s
+          maxDuration: 20s
 
   template:
     metadata:
