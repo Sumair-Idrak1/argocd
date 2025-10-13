@@ -10,13 +10,28 @@ spec:
     matchLabels:
       {{- include "deployedfrontend.selectorLabels" . | nindent 6 }}
   strategy:
-    blueGreen:
-      activeService: deployedfrontend-active          # current stable service
-      previewService: deployedfrontend-preview        # new version before promotion
-      autoPromotionEnabled: false                     # manual or metric-based promotion
-      autoPromotionSeconds: 0                         # set >0 for timed promotion
-      scaleDownDelaySeconds: 30                       # wait before deleting old pods
-      abortScaleDownDelaySeconds: 10                  # keep stable if new fails
+    canary:
+      # 🧠 Canary steps: gradually shift traffic and pause for observation
+      steps:
+        - setWeight: 20
+        - pause: { duration: 30 }
+        - setWeight: 50
+        - pause: { duration: 60 }
+
+      # ✅ Auto rollback configuration
+      progressDeadlineSeconds: 120          # Wait up to 2 min for pods to stabilize
+      progressDeadlineAbort: true           # Abort rollout if deadline exceeded
+      abortScaleDownDelaySeconds: 10        # Wait 10s before cleaning up bad ReplicaSet
+      abortScaleDownDelayAbort: true        # Immediately scale up stable RS on abort
+
+      # 🚀 Automatically revert to last stable version
+      rollbackTo:
+        revision: 0                         # 0 = revert to last stable ReplicaSet
+
+      # Optional: define traffic routing services (recommended for production)
+      # stableService: deployedfrontend-stable
+      # canaryService: deployedfrontend-canary
+
   template:
     metadata:
       labels:
