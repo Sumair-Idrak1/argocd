@@ -3,7 +3,7 @@ kind: Rollout
 metadata:
   name: deployedfrontend
 spec:
-  replicas: 2
+  replicas: 0
   revisionHistoryLimit: 5
   progressDeadlineSeconds: 60     # Wait 2 minutes max for progress
   selector:
