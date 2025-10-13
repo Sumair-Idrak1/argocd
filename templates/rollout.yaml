@@ -14,15 +14,21 @@ spec:
       # 🧠 Canary steps: gradually shift traffic and pause for observation
       steps:
         - setWeight: 20
-        - pause: { duration: 30 }     # pause 30s before next step
+        - pause: { duration: 30 }
         - setWeight: 50
-        - pause: { duration: 60 }     # pause 1min before full rollout
+        - pause: { duration: 60 }
 
-      # ✅ Auto rollback if pods fail to become healthy
-      progressDeadlineSeconds: 120       # Wait up to 2 min for pods to become healthy
-      progressDeadlineAbort: true        # Abort and rollback automatically on failure
+      # ✅ Auto rollback configuration
+      progressDeadlineSeconds: 120          # Wait up to 2 min for pods to stabilize
+      progressDeadlineAbort: true           # Abort rollout if deadline exceeded
+      abortScaleDownDelaySeconds: 10        # Wait 10s before cleaning up bad ReplicaSet
+      abortScaleDownDelayAbort: true        # Immediately scale up stable RS on abort
 
-      # (Optional) define services if you want separate traffic routing
+      # 🚀 Automatically revert to last stable version
+      rollbackTo:
+        revision: 0                         # 0 = revert to last stable ReplicaSet
+
+      # Optional: define traffic routing services (recommended for production)
       # stableService: deployedfrontend-stable
       # canaryService: deployedfrontend-canary
 
