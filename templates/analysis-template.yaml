@@ -3,49 +3,50 @@ kind: AnalysisTemplate
 metadata:
   name: pod-stability-check
 spec:
-  # Define arguments that the Rollout can pass to this template
+  # Defines the variable that the Rollout will supply (the Rollout's name)
   args:
     - name: rollout-name
   metrics:
+  
+  # Metric 1: Check for CrashLoopBackOff/Error State
   - name: stable-for-2-minutes
-    # 15s * 8 = 120s (2 minutes)
+    # Run the check every 15 seconds.
     interval: 15s
+    # Requires 8 consecutive successful checks (15s * 8 = 120s = 2 minutes).
     consecutiveSuccessLimit: 8
-    # If even one check fails, the analysis fails immediately, triggering a rollback.
+    # Rollback immediately on the first failure.
     failureLimit: 1
     
-    # 📝 Metric to check for CrashLoopBackOff or other error state
     provider:
       prometheus:
-        # NOTE: This query requires kube-state-metrics to be installed.
-        # It checks if any container of the new Rollout ReplicaSet is in 'CrashLoopBackOff'.
+        # Query Prometheus for pods matching the Rollout name that are in CrashLoopBackOff
         query: |
           sum(kube_pod_container_status_waiting_reason{
             namespace="{{ .AnalysisRun.Namespace }}",
-            # 👇 FIX IS HERE: .args.rollout-name (with the leading dot)
+            # CORRECTLY reference the argument with the leading dot: .args.rollout-name
             pod=~"{{ .args.rollout-name }}.*",
             reason="CrashLoopBackOff"
           })
           
-    # 💡 Success Condition: The query result must be exactly 0 (no pods are in CrashLoopBackOff).
+    # Success Condition: The value must be 0 (i.e., no pods in CrashLoopBackOff).
     successCondition: "{{ eq .value 0 }}"
 
+  # Metric 2: Check for General Pod Readiness
   - name: pod-ready-check
     interval: 15s
-    consecutiveSuccessLimit: 8 # 2 minutes of continuous pod readiness
+    consecutiveSuccessLimit: 8 # Requires 2 minutes of continuous pod readiness
     failureLimit: 1
     
     provider:
       prometheus:
-        # Checks if the number of ready containers is less than the total. A value > 0 means
-        # not all containers are ready (i.e., not yet stable/ready). We want 0.
+        # Check for any container that is NOT ready (container_ready="false")
         query: |
           sum(kube_pod_container_status_ready{
             namespace="{{ .AnalysisRun.Namespace }}",
-            # 👇 FIX IS HERE: .args.rollout-name (with the leading dot)
+            # CORRECTLY reference the argument with the leading dot: .args.rollout-name
             pod=~"{{ .args.rollout-name }}.*",
             container_ready="false"
           })
           
-    # 💡 Success Condition: The query result must be exactly 0 (all containers are ready).
+    # Success Condition: The value must be 0 (i.e., all required containers are ready).
     successCondition: "{{ eq .value 0 }}"
