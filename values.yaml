@@ -2,7 +2,7 @@ replicaCount: 0
 image:
   repository: sumairjaved/my-frontend
   imagePullPolicy: Always
-  tag: "087250ffad4302756c3c980382e81aad3e47ead3"
+  tag: "6831669bd1d2e65f9897e3103bb49d467c34d4ef"
 service:
   type: NodePort # or ClusterIP if only internal
   port: 5000 # Service port
