@@ -13,12 +13,10 @@ spec:
     blueGreen:
       activeService: deployedfrontend-active          # current stable service
       previewService: deployedfrontend-preview        # new version before promotion
-      autoPromotionEnabled: false                     # requires manual or metric-based promotion
-      autoPromotionSeconds: 0                         # set >0 for timed auto-promotion
-      scaleDownDelaySeconds: 30                       # delay before removing old pods
+      autoPromotionEnabled: false                     # manual or metric-based promotion
+      autoPromotionSeconds: 0                         # set >0 for timed promotion
+      scaleDownDelaySeconds: 30                       # wait before deleting old pods
       abortScaleDownDelaySeconds: 10                  # keep stable if new fails
-      prePromotionAnalysis: null                      # optional for health checks
-      postPromotionAnalysis: null                     # optional
   template:
     metadata:
       labels:
