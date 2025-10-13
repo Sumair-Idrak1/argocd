@@ -4,13 +4,12 @@ metadata:
   name: {{ include "deployedfrontend.fullname" . }}
   labels:
     {{- include "deployedfrontend.labels" . | nindent 4 }}
-
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: 5
 
-  # ✅ Place this at the top-level (spec), not under canary
-  progressDeadlineSeconds: 60 # Wait max 2 minutes for pods to become Ready
+  # ⏱️ Wait max 2 minutes for progress
+  progressDeadlineSeconds: 120
 
   selector:
     matchLabels:
@@ -18,15 +17,19 @@ spec:
 
   strategy:
     canary:
-      steps:
-        - setWeight: 20
-        - pause: { duration: 30 }  # Observe for 30s
-        - setWeight: 50
-        - pause: { duration: 60 }  # Observe for 1 min
+      # ✅ Abort rollout automatically after progressDeadlineSeconds
       progressDeadlineAbort: true
       abortScaleDownDelaySeconds: 0
+
+      steps:
+        - setWeight: 20
+        - pause: { duration: 30 }
+        - setWeight: 50
+        - pause: { duration: 60 }
+
       maxSurge: 1
       maxUnavailable: 0
+
       retryStrategy:
         limit: 1
         backoff:
