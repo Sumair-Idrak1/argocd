@@ -8,7 +8,7 @@ metadata:
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: 3
-  progressDeadlineSeconds: 30
+  progressDeadlineSeconds: 60
   selector:
     matchLabels:
       {{- include "deployedfrontend.selectorLabels" . | nindent 6 }}
@@ -17,7 +17,10 @@ spec:
       maxSurge: 1
       maxUnavailable: 0
       abortScaleDownDelaySeconds: 0
-      minReadySeconds: 10
+      analysis:
+        startingStep: 0
+        templates:
+          - templateName: check-crashloop
       steps:
         - setWeight: 20
         - pause: { duration: 10s }
@@ -40,32 +43,23 @@ spec:
             - name: http
               containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
-          startupProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 0
-            periodSeconds: 2
-            timeoutSeconds: 1
-            successThreshold: 1
-            failureThreshold: 10
           readinessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 0
-            periodSeconds: 3
-            timeoutSeconds: 2
-            successThreshold: 1
-            failureThreshold: 2
-          livenessProbe:
             httpGet:
               path: /
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5
-            timeoutSeconds: 2
-            failureThreshold: 2
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
