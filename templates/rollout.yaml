@@ -21,22 +21,29 @@ spec:
         - pause: { duration: 20 }   # Observe at 50%
 
       # Automatic rollback + retry logic
-      progressDeadlineSeconds: 30          # Wait 2 minutes for pods to stabilize
+      progressDeadlineSeconds: 30           # Wait 30s for pods to stabilize
       progressDeadlineAbort: true           # Abort rollout if deadline exceeded
-      abortScaleDownDelaySeconds: 10        # Wait before cleaning up bad ReplicaSet
+      abortScaleDownDelaySeconds: 0         # Immediately remove bad ReplicaSet
       abortScaleDownDelayAbort: true        # Immediately restore stable RS
       maxUnavailable: 0                     # Never take down all pods
       maxSurge: 1                           # Add one extra pod during update
 
-      # Retry rollout if it fails once — terminate after second failure
-      retryStrategy:
-        limit: 2                            # Retry rollout only 2 times
-        backoff:
-          duration: 30s                     # Wait 30s before retrying
-          factor: 2                         # Exponential backoff multiplier
-          maxDuration: 40s                 # Max wait time between retries
+      # Fast failure detection — rollback on CrashLoopBackOff or readiness failure
+      failureDetection:
+        enabled: true
+        failureRate: 1                      # Abort after first detected failure
+        intervalSeconds: 10                 # Check every 10 seconds
+        threshold: 3                        # Confirm failure after 3 failed checks
 
-      # Optional: Stable/Canary routing
+      # Retry rollout once — terminate after second failure
+      retryStrategy:
+        limit: 2
+        backoff:
+          duration: 30s
+          factor: 2
+          maxDuration: 40s
+
+      # Optional service routing (for ingress or load balancer)
       # stableService: deployedfrontend-stable
       # canaryService: deployedfrontend-canary
 
@@ -54,7 +61,7 @@ spec:
           ports:
             - containerPort: {{ .Values.service.port }}
 
-          # Health checks detect CrashLoopBackOff early
+          # Health checks to detect CrashLoop or failure early
           livenessProbe:
             httpGet:
               path: /
