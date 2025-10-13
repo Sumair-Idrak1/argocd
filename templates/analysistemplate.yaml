@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: check-crashloop
+  namespace: {{ .Release.Namespace }}
+spec:
+  metrics:
+    - name: check-pod-status
+      initialDelay: 5s
+      interval: 10s
+      failureLimit: 2
+      successCondition: result == "healthy"
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                serviceAccountName: argo-rollouts
+                restartPolicy: Never
+                containers:
+                  - name: check-status
+                    image: bitnami/kubectl:latest
+                    command:
+                      - sh
+                      - -c
+                      - |
+                        # Get pod status for canary pods
+                        STATUS=$(kubectl get pods -n {{ .Release.Namespace }} \
+                          -l app.kubernetes.io/name={{ include "deployedfrontend.name" . }} \
+                          -o jsonpath='{.items[*].status.containerStatuses[*].state}')
+                        
+                        # Check for CrashLoopBackOff or Error
+                        if echo "$STATUS" | grep -q "CrashLoopBackOff\|Error\|ImagePullBackOff"; then
+                          echo "unhealthy"
+                          exit 1
+                        fi
+                        
+                        # Check if all pods are ready
+                        READY=$(kubectl get pods -n {{ .Release.Namespace }} \
+                          -l app.kubernetes.io/name={{ include "deployedfrontend.name" . }} \
+                          -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' | grep -o "False" | wc -l)
+                        
+                        if [ "$READY" -gt 0 ]; then
+                          echo "unhealthy"
+                          exit 1
+                        fi
+                        
+                        echo "healthy"
