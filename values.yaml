@@ -1,9 +1,9 @@
 replicaCount: 1
 image:
-  repository: sumairjaved/my-frontend
+  repository: sumairjaved/argocd-testing
   imagePullPolicy: Always
   #tag: "dd19ef683c7557a94fd62216ac152a515e7ef305"
-  tag: "087250ffad4302756c3c980382e81aad3e47ead3"
+  tag: "v1"
 service:
   type: NodePort # or ClusterIP if only internal
   port: 5000 # Service port
